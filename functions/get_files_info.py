@@ -30,7 +30,7 @@ def is_directory(path, file):
   return os.path.isdir(absolute_path)
 
 schema_get_files_info = types.FunctionDeclaration(
-  name="get_files_info",
+  name="schema_get_files_info",
   description="Lists files in the specified directory along with their sizes, constrained to the working directory.",
   parameters=types.Schema(
     type=types.Type.OBJECT,

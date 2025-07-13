@@ -23,7 +23,7 @@ def get_file_content(working_directory, file_path):
     return f"Error: {e}"
   
 schema_get_file_content = types.FunctionDeclaration(
-  name="get_file_content",
+  name="schema_get_file_content",
   description="Read file contents in the specified directory, constrained to the working directory.",
   parameters=types.Schema(
     type=types.Type.OBJECT,

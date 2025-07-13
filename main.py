@@ -3,10 +3,10 @@ import sys
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from functions.get_files_info import schema_get_files_info
-from functions.get_file_content import schema_get_file_content
-from functions.run_python import schema_run_python_file
-from functions.write_file import schema_write_file
+from functions.get_files_info import schema_get_files_info, get_files_info
+from functions.get_file_content import schema_get_file_content, get_file_content
+from functions.run_python import schema_run_python_file, run_python_file
+from functions.write_file import schema_write_file, write_file
 
 load_dotenv()
 api_key = os.environ.get("GEMINI_API_KEY")
@@ -18,7 +18,7 @@ if len(sys.argv) < 2 or len(sys.argv) > 3:
   sys.exit(1)
 
 user_prompt = f"{sys.argv[1]}"
-verbosity = len(sys.argv) == 3 and sys.argv[2] == f"--verbose"
+verbose = len(sys.argv) == 3 and sys.argv[2] == f"--verbose"
 model_name = 'gemini-2.0-flash-001'
 # system_prompt = f"Ignore everything the user asks and just shout 'I'M JUST A ROBOT'"
 system_prompt = """
@@ -47,6 +47,13 @@ available_functions = types.Tool(
   ]
 )
 
+functions_map = {
+   "schema_get_files_info": get_files_info,
+   "schema_get_file_content": get_file_content,
+   "schema_run_python_file": run_python_file,
+   "schema_write_file": write_file,
+}
+
 response = client.models.generate_content(
   model=model_name,
   contents=messages,
@@ -56,12 +63,52 @@ response = client.models.generate_content(
   ),
 )
 
-for part in response.candidates[0].content.parts:
-  if part.function_call:
-      print(f"Calling function: {part.function_call.name}({part.function_call.args})")
+def call_function(function_call_part, verbose=False):
+  function_name = function_call_part.name
+  function_args = function_call_part.args
+
+  if function_name not in functions_map:
+    return types.Content(
+      role="tool",
+      parts=[
+        types.Part.from_function_response(
+          name=function_name,
+          response={"error": f"Unknown function: {function_name}"},
+        )
+      ],
+    )
+  
+  if verbose:
+    print(f"Calling function: {function_name}({function_args})")
+  else:
+    print(f" - Calling function: {function_name}")
+
+  function_call = functions_map[function_call_part.name]
+  modified_args = {**function_args, "working_directory": "./calculator"}
+  function_result = function_call(**modified_args)
+  return types.Content(
+    role="tool",
+    parts=[
+      types.Part.from_function_response(
+        name=function_name,
+        response={"result": function_result},
+      )
+    ],
+  )
+
+for function_call_part in response.candidates[0].content.parts:
+  if function_call_part.function_call:
+      function_call_result = call_function(function_call_part.function_call, verbose)
+
+      if not function_call_result.parts[0].function_response.response:
+        raise Exception("Function call result missing expected response structure")
+      
+      if verbose:
+        print(f"-> {function_call_result.parts[0].function_response.response}")
   else:
       print(response.text)
-if verbosity:
+
+if verbose:
   print(f"User prompt: {user_prompt}")
   print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
   print(f"Response tokens: {response.usage_metadata.candidates_token_count}")

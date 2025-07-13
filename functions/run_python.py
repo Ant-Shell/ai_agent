@@ -35,7 +35,7 @@ def run_python_file(working_directory, file_path):
     return f"Error: executing Python file: {e}"
   
 schema_run_python_file = types.FunctionDeclaration(
-  name="run_python_file",
+  name="schema_run_python_file",
   description="Execute Python files with optional arguments in the specified directory, constrained to the working directory.",
   parameters=types.Schema(
     type=types.Type.OBJECT,

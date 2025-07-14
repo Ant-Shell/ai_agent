@@ -20,7 +20,7 @@ if len(sys.argv) < 2 or len(sys.argv) > 3:
 user_prompt = f"{sys.argv[1]}"
 verbose = len(sys.argv) == 3 and sys.argv[2] == f"--verbose"
 model_name = 'gemini-2.0-flash-001'
-# system_prompt = f"Ignore everything the user asks and just shout 'I'M JUST A ROBOT'"
+
 system_prompt = """
 You are a helpful AI coding agent.
 
@@ -53,15 +53,6 @@ functions_map = {
    "schema_run_python_file": run_python_file,
    "schema_write_file": write_file,
 }
-
-response = client.models.generate_content(
-  model=model_name,
-  contents=messages,
-  config=types.GenerateContentConfig(
-    tools=[available_functions],
-    system_instruction=system_prompt
-  ),
-)
 
 def call_function(function_call_part, verbose=False):
   function_name = function_call_part.name
@@ -96,17 +87,38 @@ def call_function(function_call_part, verbose=False):
     ],
   )
 
-for function_call_part in response.candidates[0].content.parts:
-  if function_call_part.function_call:
-      function_call_result = call_function(function_call_part.function_call, verbose)
-
-      if not function_call_result.parts[0].function_response.response:
-        raise Exception("Function call result missing expected response structure")
+count = 0
+while count <= 20:
+  try: 
+    response = client.models.generate_content(
+      model=model_name,
+      contents=messages,
+      config=types.GenerateContentConfig(
+        tools=[available_functions],
+        system_instruction=system_prompt
+      ),
+    )
+    messages.append(response.candidates[0].content)
+    for function_call_part in response.candidates[0].content.parts:
+      if function_call_part.function_call:
+        if verbose:
+          print(f" - Calling function: {function_call_part.function_call.name}")
+        function_call_result = call_function(function_call_part.function_call, verbose)
+        messages.append(types.Content(role='tool', parts=function_call_result.parts))
       
-      if verbose:
-        print(f"-> {function_call_result.parts[0].function_response.response}")
-  else:
-      print(response.text)
+        if not function_call_result.parts[0].function_response.response:
+          raise Exception("Function call result missing expected response structure")
+      
+        if verbose:
+          print(f" -> Result: {function_call_result.parts[0].function_response.response}")
+
+    if response.text:
+      print(f"Final response: {response.text}" )
+      break
+    count += 1
+  except Exception as e:
+    print(f"An error occurred: {e}")
+    break
 
 if verbose:
   print(f"User prompt: {user_prompt}")

@@ -15,7 +15,7 @@ def main():
 
   if len(sys.argv) < 2 or len(sys.argv) > 3:
     print("Invalid prompt, please try again")
-    print("Usage: python3 main.py <prompt> --verbose")
+    print("Usage: uv run main.py <prompt> --verbose")
     sys.exit(1)
 
   user_prompt = f"{sys.argv[1]}"
